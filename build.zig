@@ -60,6 +60,11 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // Link architecture-specific assembly files
+    if (target.result.cpu.arch == .x86_64) {
+        exe.root_module.addAssemblyFile(b.path("src/simd_add.s"));
+    }
+
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
