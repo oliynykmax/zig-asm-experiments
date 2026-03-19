@@ -13,3 +13,4 @@ zig-out/
 
 # mise 
 mise.toml
+popcount_test

@@ -220,9 +220,62 @@ fn benchmarkBitScan() !void {
     try stdout.print("asm tzcnt: {d:.3} ms\n", .{@as(f64, @floatFromInt(asm_ns)) / 1_000_000.0});
 }
 
+// ============================================================
+// Hardware CRC32 — 5-10x faster than table-based
+// The compiler cannot recognize CRC patterns and emit hw CRC.
+// x86_64: crc32l (SSE4.2, 1 instruction per 4 bytes)
+// aarch64: CRC32W (CRC extension, standard on Cortex-A53+)
+// ============================================================
+
+fn crc32_table_zig(data: [*]const u8, len: usize) u32 {
+    // Use CRC-32C (Castagnoli) — same polynomial as hardware crc32 instruction
+    const Crc32C = std.hash.crc.Crc32Iscsi;
+    var hasher = Crc32C.init();
+    hasher.update(data[0..len]);
+    return hasher.final();
+}
+
+// Defined in src/crc32_hw.s
+extern fn crc32_hw(data: [*]const u8, len: usize) u32;
+
+fn benchmarkCrc32() !void {
+    const stdout = std.fs.File.stdout().deprecatedWriter();
+    const buf_size = 1024 * 1024; // 1MB
+    const iterations = 50;
+
+    var buf: [buf_size]u8 = undefined;
+    var prng = std.Random.DefaultPrng.init(123);
+    prng.random().bytes(&buf);
+
+    try stdout.print("\n--- Hardware CRC32 (vs table lookup) ---\n", .{});
+    try stdout.print("buffer: {d} KB, iterations: {d}\n", .{ buf_size / 1024, iterations });
+
+    var timer = try std.time.Timer.start();
+
+    var zig_crc: u32 = 0;
+    for (0..iterations) |_| {
+        zig_crc = crc32_table_zig(&buf, buf_size);
+    }
+    const zig_ns = timer.read();
+    timer.reset();
+
+    var asm_crc: u32 = 0;
+    for (0..iterations) |_| {
+        asm_crc = crc32_hw(&buf, buf_size);
+    }
+    const asm_ns = timer.read();
+
+    const zig_mb_s = @as(f64, @floatFromInt(buf_size * iterations)) / (@as(f64, @floatFromInt(zig_ns)) / 1_000_000_000.0) / (1024 * 1024);
+    const asm_mb_s = @as(f64, @floatFromInt(buf_size * iterations)) / (@as(f64, @floatFromInt(asm_ns)) / 1_000_000_000.0) / (1024 * 1024);
+
+    try stdout.print("zig table: {d:.3} ms ({d:.0} MB/s) crc=0x{x}\n", .{ @as(f64, @floatFromInt(zig_ns)) / 1_000_000.0, zig_mb_s, zig_crc });
+    try stdout.print("asm hw:    {d:.3} ms ({d:.0} MB/s) crc=0x{x}\n", .{ @as(f64, @floatFromInt(asm_ns)) / 1_000_000.0, asm_mb_s, asm_crc });
+}
+
 pub fn main() !void {
     try benchmarkAdd();
     try benchmarkSimdAdd();
     try benchmarkCycleCounter();
     try benchmarkBitScan();
+    try benchmarkCrc32();
 }

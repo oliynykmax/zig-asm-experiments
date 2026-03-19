@@ -63,6 +63,7 @@ pub fn build(b: *std.Build) void {
     // Link architecture-specific assembly files
     if (target.result.cpu.arch == .x86_64) {
         exe.root_module.addAssemblyFile(b.path("src/simd_add.s"));
+        exe.root_module.addAssemblyFile(b.path("src/crc32_hw.s"));
     }
 
     // This declares intent for the executable to be installed into the
