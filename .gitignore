@@ -1,0 +1,15 @@
+# Zig
+zig-cache/
+zig-out/
+.zig-cache/
+
+# Assembly build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.exe
+
+# mise 
+mise.toml
